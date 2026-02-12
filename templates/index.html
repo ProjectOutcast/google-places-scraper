@@ -21,8 +21,44 @@
                 </svg>
             </div>
             <h1>Google Places Scraper</h1>
-            <p class="subtitle">Scrape businesses from Google Maps for any location. Enter your API key, pick a location and categories, and download the results as Excel or CSV.</p>
+            <p class="subtitle">Scrape businesses from Google Maps for any location. Enter your API key, pick a location and categories, and download the results as CSV.</p>
         </header>
+
+        <!-- API Setup Guide -->
+        <div class="setup-guide card">
+            <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                First time? Set up your Google API key
+            </h2>
+            <div class="setup-steps">
+                <div class="setup-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <strong>Create a Google Cloud project</strong>
+                        <span>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">console.cloud.google.com</a> and create a new project (or use an existing one).</span>
+                    </div>
+                </div>
+                <div class="setup-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <strong>Enable 2 APIs</strong>
+                        <span>In your project, go to <strong>APIs &amp; Services &gt; Library</strong> and enable both:</span>
+                        <div class="api-chips">
+                            <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener" class="api-chip">Places API</a>
+                            <a href="https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com" target="_blank" rel="noopener" class="api-chip">Geocoding API</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="setup-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <strong>Get your API key</strong>
+                        <span>Go to <strong>APIs &amp; Services &gt; Credentials</strong>, click <strong>Create Credentials &gt; API Key</strong>, and paste it below.</span>
+                    </div>
+                </div>
+            </div>
+            <button type="button" id="toggleGuide" class="btn-text" style="margin-top:0.5rem;">Hide this guide</button>
+        </div>
 
         <!-- Configuration Form -->
         <form id="scrapeForm" class="card">
@@ -96,18 +132,6 @@
             </button>
         </form>
 
-        <!-- History Panel -->
-        <div id="historyPanel" class="card hidden">
-            <div class="history-header">
-                <h2>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    Recent Scrapes
-                </h2>
-                <button id="clearHistoryBtn" class="btn-text">Clear</button>
-            </div>
-            <div id="historyList"></div>
-        </div>
-
         <!-- Progress Panel -->
         <div id="progressPanel" class="card hidden">
             <h2>
@@ -134,12 +158,6 @@
 
             <!-- Summary Stats -->
             <div class="summary-grid" id="summaryGrid"></div>
-
-            <!-- Top Rated -->
-            <div id="topRated" class="top-rated hidden">
-                <h3>Top Rated</h3>
-                <div id="topRatedList"></div>
-            </div>
 
             <!-- Interactive Map -->
             <div id="mapSection" class="map-section hidden">
@@ -177,18 +195,12 @@
                 </div>
             </div>
 
-            <!-- Download Buttons -->
+            <!-- Download -->
             <div class="download-section">
-                <div class="download-buttons">
-                    <button id="downloadBtn" class="btn-download">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Download Excel (.xlsx)
-                    </button>
-                    <button id="downloadCsvBtn" class="btn-download btn-download-csv">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                        Download CSV
-                    </button>
-                </div>
+                <button id="downloadCsvBtn" class="btn-download">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Download CSV
+                </button>
                 <button id="newScrapeBtn" class="btn-secondary">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                     Run Another Scrape

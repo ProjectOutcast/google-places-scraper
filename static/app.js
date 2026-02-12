@@ -4,8 +4,8 @@ let currentJobId = null;
 let eventSource = null;
 let leafletMap = null;
 let currentBusinesses = [];
-let sortColumn = null;
-let sortAsc = true;
+let sortColumn = 'rating';
+let sortAsc = false;
 
 const CATEGORY_EMOJIS = {
     'restaurant': '🍽️', 'things-to-do': '🎯', 'spa': '💆',
@@ -27,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPresets();
     setupEventListeners();
     loadSavedApiKey();
-    renderHistory();
 });
 
 // ─── Category Presets ────────────────────────────────────────────────────
@@ -84,68 +83,6 @@ function saveApiKeyIfNeeded() {
     }
 }
 
-// ─── localStorage: History ──────────────────────────────────────────────
-
-function getHistory() {
-    try {
-        return JSON.parse(localStorage.getItem('scraper_history') || '[]');
-    } catch { return []; }
-}
-
-function addToHistory(entry) {
-    const history = getHistory();
-    history.unshift(entry);
-    // Keep last 10
-    localStorage.setItem('scraper_history', JSON.stringify(history.slice(0, 10)));
-    renderHistory();
-}
-
-function renderHistory() {
-    const history = getHistory();
-    const panel = document.getElementById('historyPanel');
-    const list = document.getElementById('historyList');
-
-    if (history.length === 0) {
-        panel.classList.add('hidden');
-        return;
-    }
-
-    panel.classList.remove('hidden');
-    list.innerHTML = history.map((h, i) => {
-        const date = new Date(h.timestamp).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
-        const cats = (h.categories || []).join(', ');
-        return `
-            <div class="history-item">
-                <div class="history-info">
-                    <span class="history-location">${escapeHtml(h.location)}</span>
-                    <span class="history-meta">${date} · ${h.total || 0} results · ${cats}</span>
-                </div>
-                <button class="btn-text" onclick="rerunFromHistory(${i})">Re-run</button>
-            </div>
-        `;
-    }).join('');
-}
-
-function rerunFromHistory(index) {
-    const history = getHistory();
-    const h = history[index];
-    if (!h) return;
-
-    document.getElementById('location').value = h.location || '';
-    document.getElementById('radius').value = h.radius || 3000;
-    document.getElementById('radius').dispatchEvent(new Event('input'));
-    document.getElementById('customQueries').value = '';
-
-    // Set category checkboxes
-    document.querySelectorAll('input[name="categories"]').forEach(cb => {
-        cb.checked = (h.categories || []).includes(cb.value);
-    });
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
 // ─── Event Listeners ─────────────────────────────────────────────────────
 
 function setupEventListeners() {
@@ -167,12 +104,34 @@ function setupEventListeners() {
 
     document.getElementById('newScrapeBtn').addEventListener('click', resetToForm);
     document.getElementById('errorRetryBtn').addEventListener('click', resetToForm);
-    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-        localStorage.removeItem('scraper_history');
-        renderHistory();
+
+    // Setup guide toggle
+    document.getElementById('toggleGuide').addEventListener('click', () => {
+        const guide = document.querySelector('.setup-guide');
+        const btn = document.getElementById('toggleGuide');
+        const steps = guide.querySelector('.setup-steps');
+        if (steps.classList.contains('hidden')) {
+            steps.classList.remove('hidden');
+            btn.textContent = 'Hide this guide';
+            localStorage.removeItem('scraper_hide_guide');
+        } else {
+            steps.classList.add('hidden');
+            btn.textContent = 'Show setup guide';
+            localStorage.setItem('scraper_hide_guide', '1');
+        }
     });
 
-    // Table sorting
+    // Restore guide visibility
+    if (localStorage.getItem('scraper_hide_guide')) {
+        const guide = document.querySelector('.setup-guide');
+        guide.querySelector('.setup-steps').classList.add('hidden');
+        document.getElementById('toggleGuide').textContent = 'Show setup guide';
+    }
+
+    // Table sorting — set initial indicator for default sort (rating desc)
+    const ratingTh = document.querySelector('#previewTable th[data-sort="rating"]');
+    if (ratingTh) ratingTh.classList.add('sort-desc');
+
     document.querySelectorAll('#previewTable th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             const col = th.dataset.sort;
@@ -209,9 +168,6 @@ async function handleSubmit(e) {
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner"></span> Starting...';
-
-    // Store for history
-    window._lastScrapeParams = { location, radius, categories, customQueries };
 
     try {
         const resp = await fetch('/api/scrape', {
@@ -253,20 +209,9 @@ function connectSSE(jobId) {
                 eventSource = null;
                 updateProgressBar(100);
                 showResults(data.summary, data.has_file);
-                // Add to history
-                if (window._lastScrapeParams && data.summary) {
-                    addToHistory({
-                        timestamp: new Date().toISOString(),
-                        location: window._lastScrapeParams.location,
-                        radius: window._lastScrapeParams.radius,
-                        categories: window._lastScrapeParams.categories,
-                        total: data.summary.total,
-                        jobId: currentJobId,
-                    });
-                }
-                // Auto-download Excel
+                // Auto-download CSV
                 if (data.has_file && currentJobId) {
-                    setTimeout(() => { window.location.href = `/api/download/${currentJobId}`; }, 500);
+                    setTimeout(() => { window.location.href = `/api/download/${currentJobId}?format=csv`; }, 500);
                 }
                 break;
             case 'error':
@@ -291,7 +236,6 @@ function connectSSE(jobId) {
 
 function showProgressPanel() {
     document.getElementById('scrapeForm').classList.add('hidden');
-    document.getElementById('historyPanel').classList.add('hidden');
     document.getElementById('progressPanel').classList.remove('hidden');
     document.getElementById('resultsPanel').classList.add('hidden');
     document.getElementById('errorPanel').classList.add('hidden');
@@ -327,7 +271,6 @@ function showResults(summary, hasFile) {
                 <div class="stat-value">0</div>
                 <div class="stat-label">No businesses found</div>
             </div>`;
-        document.getElementById('downloadBtn').classList.add('hidden');
         document.getElementById('downloadCsvBtn').classList.add('hidden');
         return;
     }
@@ -343,16 +286,6 @@ function showResults(summary, hasFile) {
     }
     grid.innerHTML = html;
 
-    // Top rated
-    if (summary.top5 && summary.top5.length > 0) {
-        document.getElementById('topRated').classList.remove('hidden');
-        document.getElementById('topRatedList').innerHTML = summary.top5.map(b => `
-            <div class="top-rated-item">
-                <span class="top-rated-name">${escapeHtml(b.name)}</span>
-                <span class="top-rated-meta"><span class="star">★</span> ${b.rating} <span>(${b.reviews})</span> <span>${escapeHtml(b.category)}</span></span>
-            </div>`).join('');
-    }
-
     // Map + Table (need businesses data)
     const businesses = summary.businesses || [];
     currentBusinesses = businesses;
@@ -363,10 +296,8 @@ function showResults(summary, hasFile) {
         document.getElementById('tableCount').textContent = `${businesses.length} results`;
     }
 
-    // Download buttons
+    // Download button
     if (hasFile) {
-        document.getElementById('downloadBtn').classList.remove('hidden');
-        document.getElementById('downloadBtn').onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
         document.getElementById('downloadCsvBtn').classList.remove('hidden');
         document.getElementById('downloadCsvBtn').onclick = () => { window.location.href = `/api/download/${currentJobId}?format=csv`; };
     }
@@ -407,8 +338,9 @@ function renderMap(businesses) {
 
         const marker = L.marker([b.latitude, b.longitude], { icon });
         const rating = b.rating ? `<br>★ ${b.rating} (${b.reviews_count} reviews)` : '';
-        const photo = b.photo_url ? `<img src="${b.photo_url}" style="width:120px;height:80px;object-fit:cover;border-radius:4px;margin-bottom:4px;display:block;">` : '';
-        marker.bindPopup(`${photo}<b>${escapeHtml(b.name)}</b><br><span style="color:${color}">${escapeHtml(b.category)}</span>${rating}`);
+        const photo = b.photo_url ? `<img src="${b.photo_url}" style="width:140px;height:90px;object-fit:cover;border-radius:4px;margin-bottom:6px;display:block;">` : '';
+        const gmapsLink = b.google_maps_url ? `<br><a href="${b.google_maps_url}" target="_blank" rel="noopener" style="color:#3b82f6;font-size:12px;text-decoration:none;font-weight:600;">View on Google Maps &rarr;</a>` : '';
+        marker.bindPopup(`${photo}<b>${escapeHtml(b.name)}</b><br><span style="color:${color}">${escapeHtml(b.category)}</span>${rating}${gmapsLink}`, { maxWidth: 200 });
         marker.addTo(leafletMap);
         markers.push(marker);
     });
@@ -485,7 +417,6 @@ function resetToForm() {
     // Reset results sub-sections
     document.getElementById('mapSection').classList.add('hidden');
     document.getElementById('tableSection').classList.add('hidden');
-    document.getElementById('topRated').classList.add('hidden');
 
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = false;
@@ -495,10 +426,14 @@ function resetToForm() {
     if (leafletMap) { leafletMap.remove(); leafletMap = null; }
     currentJobId = null;
     currentBusinesses = [];
-    sortColumn = null;
-    sortAsc = true;
+    sortColumn = 'rating';
+    sortAsc = false;
 
-    renderHistory();
+    // Reset sort indicators
+    document.querySelectorAll('#previewTable th[data-sort]').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+    const ratingTh = document.querySelector('#previewTable th[data-sort="rating"]');
+    if (ratingTh) ratingTh.classList.add('sort-desc');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

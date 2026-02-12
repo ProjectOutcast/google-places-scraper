@@ -604,10 +604,6 @@ input[type="range"]::-moz-range-thumb {
         font-size: 1.4rem;
     }
 
-    .download-buttons {
-        grid-template-columns: 1fr;
-    }
-
     #map {
         height: 260px;
     }
@@ -617,6 +613,97 @@ input[type="range"]::-moz-range-thumb {
         align-items: flex-start;
         gap: 0.4rem;
     }
+}
+
+/* ─── Setup Guide ────────────────────────────────────────────────────── */
+
+.setup-guide {
+    border-color: rgba(59, 130, 246, 0.25);
+    background: linear-gradient(135deg, rgba(30, 41, 59, 1), rgba(30, 41, 59, 0.8));
+}
+
+.setup-guide h2 {
+    color: var(--accent);
+    font-size: 1rem;
+}
+
+.setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.setup-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.step-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.step-content strong {
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.step-content span {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.step-content a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.step-content a:hover {
+    text-decoration: underline;
+}
+
+.api-chips {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.api-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    background: var(--accent-glow);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 20px;
+    color: var(--accent) !important;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: all 0.15s;
+}
+
+.api-chip:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: var(--accent);
 }
 
 /* ─── Remember API Key ────────────────────────────────────────────────── */
@@ -914,22 +1001,6 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Download Buttons ───────────────────────────────────────────────── */
-
-.download-buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-
-.btn-download-csv {
-    background: #6366f1 !important;
-}
-
-.btn-download-csv:hover {
-    background: #4f46e5 !important;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
-}
 
 /* ─── Spinner ─────────────────────────────────────────────────────────── */
 
