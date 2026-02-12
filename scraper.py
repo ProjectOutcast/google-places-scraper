@@ -82,6 +82,52 @@ CATEGORY_PRESETS = {
 
 DEFAULT_CATEGORIES = ["restaurant", "things-to-do", "spa", "hotel", "guest-house"]
 
+# Maps Google Place types → our category labels.
+# Used to re-categorize businesses based on what Google actually classifies them as.
+GOOGLE_TYPE_TO_CATEGORY = {
+    "restaurant": "Restaurant",
+    "cafe": "Restaurant",
+    "bar": "Restaurant",
+    "food": "Restaurant",
+    "bakery": "Restaurant",
+    "meal_delivery": "Restaurant",
+    "meal_takeaway": "Restaurant",
+    "tourist_attraction": "Things To Do",
+    "amusement_park": "Things To Do",
+    "aquarium": "Things To Do",
+    "art_gallery": "Things To Do",
+    "museum": "Things To Do",
+    "park": "Things To Do",
+    "zoo": "Things To Do",
+    "spa": "Spa",
+    "beauty_salon": "Spa",
+    "hair_care": "Spa",
+    "lodging": "Hotel",
+    "night_club": "Nightlife",
+    "gym": "Gym",
+    "shopping_mall": "Shopping",
+    "store": "Shopping",
+    "clothing_store": "Shopping",
+    "supermarket": "Shopping",
+    "convenience_store": "Shopping",
+    "hospital": "Health",
+    "pharmacy": "Health",
+    "doctor": "Health",
+    "dentist": "Health",
+    "health": "Health",
+}
+
+# Google types that should EXCLUDE a business from a given category.
+# e.g. if searching for "Gym", exclude places Google classifies as yoga/spa.
+CATEGORY_EXCLUDE_TYPES = {
+    "Gym": {"spa", "beauty_salon", "hair_care", "yoga_studio", "travel_agency",
+            "lodging", "restaurant", "cafe", "bar", "food"},
+    "Spa": {"gym", "restaurant", "cafe", "bar", "food", "lodging"},
+    "Restaurant": {"lodging", "gym", "spa"},
+    "Hotel": {"restaurant", "cafe", "bar", "food", "gym", "spa"},
+    "Guest House": {"restaurant", "cafe", "bar", "food", "gym", "spa"},
+}
+
 
 # ─── Data Model ──────────────────────────────────────────────────────────────
 
@@ -203,6 +249,24 @@ def _price_level_to_string(level):
     if level is None:
         return ""
     return "$" * level if level > 0 else "Free"
+
+
+def _resolve_category(google_types: list, fallback_category: str) -> str:
+    """Determine the best category label from Google's actual place types.
+
+    Prefers a matching GOOGLE_TYPE_TO_CATEGORY entry over the search-preset label.
+    Falls back to the preset label if no specific match is found.
+    """
+    for gtype in google_types:
+        mapped = GOOGLE_TYPE_TO_CATEGORY.get(gtype)
+        if mapped:
+            return mapped
+    return fallback_category
+
+
+def _get_expected_types(category: str) -> set:
+    """Return the set of Google types that legitimately belong to a category."""
+    return {gtype for gtype, cat in GOOGLE_TYPE_TO_CATEGORY.items() if cat == category}
 
 
 def slugify(text: str) -> str:
@@ -382,6 +446,21 @@ def run_scraper(
             emit(f"Skipped (closed): {place.get('name', '?')}")
             continue
 
+        google_types = place.get("types", [])
+
+        # Determine the real category from Google's types
+        real_category = _resolve_category(google_types, category)
+
+        # Filter out mismatches: if Google's types indicate this place
+        # doesn't belong in the requested category, skip it
+        exclude_types = CATEGORY_EXCLUDE_TYPES.get(category, set())
+        if exclude_types and any(t in exclude_types for t in google_types):
+            # Only skip if the place has NO types matching the requested category
+            requested_types = _get_expected_types(category)
+            if not any(t in requested_types for t in google_types):
+                emit(f"Skipped (mismatch): {place.get('name', '?')} — Google types: {', '.join(google_types)}")
+                continue
+
         loc = place.get("geometry", {}).get("location", {})
 
         # Build photo URL from first photo reference
@@ -397,8 +476,8 @@ def run_scraper(
 
         biz = Business(
             name=place.get("name", ""),
-            category=category,
-            google_types=", ".join(place.get("types", [])),
+            category=real_category,
+            google_types=", ".join(google_types),
             address=place.get("formatted_address", ""),
             phone=place.get("international_phone_number", "") or place.get("formatted_phone_number", ""),
             website=place.get("website", ""),
