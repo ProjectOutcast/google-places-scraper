@@ -28,21 +28,15 @@ DEFAULT_RADIUS = 3000
 REQUEST_DELAY = 0.2
 
 CATEGORY_PRESETS = {
+    # ── PRIMARY (always visible) ──────────────────────────────────────────
     "restaurant": [
         {"query": "restaurant", "category": "Restaurant", "type": "restaurant"},
         {"query": "cafe", "category": "Restaurant", "type": "cafe"},
         {"query": "bar", "category": "Restaurant", "type": "bar"},
     ],
-    "things-to-do": [
-        {"query": "things to do", "category": "Things To Do", "type": None},
-        {"query": "tourist attraction", "category": "Things To Do", "type": "tourist_attraction"},
-        {"query": "diving", "category": "Things To Do", "type": None},
-        {"query": "snorkeling", "category": "Things To Do", "type": None},
-        {"query": "yoga", "category": "Things To Do", "type": None},
-    ],
-    "spa": [
-        {"query": "spa", "category": "Spa", "type": "spa"},
-        {"query": "massage", "category": "Spa", "type": None},
+    "coffee-shops": [
+        {"query": "coffee shop", "category": "Coffee Shops", "type": "cafe"},
+        {"query": "cafe", "category": "Coffee Shops", "type": "cafe"},
     ],
     "hotel": [
         {"query": "hotel", "category": "Hotel", "type": "lodging"},
@@ -55,18 +49,23 @@ CATEGORY_PRESETS = {
         {"query": "villa", "category": "Guest House", "type": None},
         {"query": "bungalow", "category": "Guest House", "type": None},
     ],
+    "things-to-do": [
+        {"query": "things to do", "category": "Things To Do", "type": None},
+        {"query": "tourist attraction", "category": "Things To Do", "type": "tourist_attraction"},
+    ],
     "nightlife": [
         {"query": "nightclub", "category": "Nightlife", "type": "night_club"},
         {"query": "bar", "category": "Nightlife", "type": "bar"},
         {"query": "lounge", "category": "Nightlife", "type": None},
     ],
-    "coworking": [
-        {"query": "coworking space", "category": "Coworking", "type": None},
-        {"query": "coworking", "category": "Coworking", "type": None},
+    "spa-beauty": [
+        {"query": "spa", "category": "Spa & Beauty", "type": "spa"},
+        {"query": "beauty salon", "category": "Spa & Beauty", "type": "beauty_salon"},
+        {"query": "hair salon", "category": "Spa & Beauty", "type": "hair_care"},
     ],
-    "gym": [
-        {"query": "gym", "category": "Gym", "type": "gym"},
-        {"query": "fitness center", "category": "Gym", "type": None},
+    "gym-fitness": [
+        {"query": "gym", "category": "Gym & Fitness", "type": "gym"},
+        {"query": "fitness center", "category": "Gym & Fitness", "type": None},
     ],
     "shopping": [
         {"query": "shopping", "category": "Shopping", "type": "shopping_mall"},
@@ -74,13 +73,98 @@ CATEGORY_PRESETS = {
         {"query": "store", "category": "Shopping", "type": "store"},
     ],
     "health": [
-        {"query": "hospital", "category": "Health", "type": "hospital"},
-        {"query": "clinic", "category": "Health", "type": None},
-        {"query": "pharmacy", "category": "Health", "type": "pharmacy"},
+        {"query": "hospital", "category": "Health & Medical", "type": "hospital"},
+        {"query": "clinic", "category": "Health & Medical", "type": None},
+        {"query": "pharmacy", "category": "Health & Medical", "type": "pharmacy"},
+    ],
+    "real-estate": [
+        {"query": "real estate agency", "category": "Real Estate", "type": "real_estate_agency"},
+        {"query": "real estate agent", "category": "Real Estate", "type": "real_estate_agency"},
+        {"query": "property management", "category": "Real Estate", "type": None},
+    ],
+    "coworking": [
+        {"query": "coworking space", "category": "Coworking", "type": None},
+        {"query": "coworking", "category": "Coworking", "type": None},
+    ],
+    # ── SECONDARY (show more) ─────────────────────────────────────────────
+    "dentist": [
+        {"query": "dentist", "category": "Dentist", "type": "dentist"},
+        {"query": "dental clinic", "category": "Dentist", "type": "dentist"},
+    ],
+    "veterinary": [
+        {"query": "veterinarian", "category": "Veterinary", "type": "veterinary_care"},
+        {"query": "animal hospital", "category": "Veterinary", "type": "veterinary_care"},
+    ],
+    "car-services": [
+        {"query": "car repair", "category": "Car Services", "type": "car_repair"},
+        {"query": "car wash", "category": "Car Services", "type": "car_wash"},
+        {"query": "car rental", "category": "Car Services", "type": "car_rental"},
+    ],
+    "supermarket": [
+        {"query": "supermarket", "category": "Supermarket", "type": "supermarket"},
+        {"query": "grocery store", "category": "Supermarket", "type": "convenience_store"},
+    ],
+    "bank": [
+        {"query": "bank", "category": "Bank & ATM", "type": "bank"},
+        {"query": "atm", "category": "Bank & ATM", "type": "atm"},
+    ],
+    "pharmacy": [
+        {"query": "pharmacy", "category": "Pharmacy", "type": "pharmacy"},
+        {"query": "drugstore", "category": "Pharmacy", "type": None},
+    ],
+    "education": [
+        {"query": "school", "category": "School & Education", "type": "school"},
+        {"query": "university", "category": "School & Education", "type": "university"},
+        {"query": "language school", "category": "School & Education", "type": None},
+    ],
+    "yoga-pilates": [
+        {"query": "yoga studio", "category": "Yoga & Pilates", "type": None},
+        {"query": "pilates studio", "category": "Yoga & Pilates", "type": None},
+    ],
+    "laundry": [
+        {"query": "laundry", "category": "Laundry", "type": "laundry"},
+        {"query": "dry cleaning", "category": "Laundry", "type": None},
+    ],
+    "pet-store": [
+        {"query": "pet store", "category": "Pet Store", "type": "pet_store"},
+        {"query": "pet shop", "category": "Pet Store", "type": "pet_store"},
+    ],
+    "electronics": [
+        {"query": "electronics store", "category": "Electronics", "type": "electronics_store"},
+        {"query": "phone repair", "category": "Electronics", "type": None},
+    ],
+    "furniture-home": [
+        {"query": "furniture store", "category": "Furniture & Home", "type": "furniture_store"},
+        {"query": "home goods store", "category": "Furniture & Home", "type": "home_goods_store"},
+    ],
+    "travel-agency": [
+        {"query": "travel agency", "category": "Travel Agency", "type": "travel_agency"},
+        {"query": "tour operator", "category": "Travel Agency", "type": None},
+    ],
+    "barbershop": [
+        {"query": "barbershop", "category": "Barbershop", "type": "hair_care"},
+        {"query": "barber", "category": "Barbershop", "type": "hair_care"},
+    ],
+    "physiotherapy": [
+        {"query": "physiotherapist", "category": "Physiotherapy", "type": "physiotherapist"},
+        {"query": "physical therapy", "category": "Physiotherapy", "type": "physiotherapist"},
     ],
 }
 
-DEFAULT_CATEGORIES = ["restaurant", "things-to-do", "spa", "hotel", "guest-house"]
+PRIMARY_CATEGORIES = [
+    "restaurant", "coffee-shops", "hotel", "guest-house", "things-to-do",
+    "nightlife", "spa-beauty", "gym-fitness", "shopping", "health",
+    "real-estate", "coworking",
+]
+
+SECONDARY_CATEGORIES = [
+    "dentist", "veterinary", "car-services", "supermarket", "bank",
+    "pharmacy", "education", "yoga-pilates", "laundry", "pet-store",
+    "electronics", "furniture-home", "travel-agency", "barbershop",
+    "physiotherapy",
+]
+
+DEFAULT_CATEGORIES = ["restaurant", "coffee-shops", "hotel", "things-to-do", "spa-beauty"]
 
 # Maps Google Place types → our category labels.
 # Used to re-categorize businesses based on what Google actually classifies them as.
@@ -99,33 +183,55 @@ GOOGLE_TYPE_TO_CATEGORY = {
     "museum": "Things To Do",
     "park": "Things To Do",
     "zoo": "Things To Do",
-    "spa": "Spa",
-    "beauty_salon": "Spa",
-    "hair_care": "Spa",
+    "spa": "Spa & Beauty",
+    "beauty_salon": "Spa & Beauty",
+    "hair_care": "Spa & Beauty",
     "lodging": "Hotel",
     "night_club": "Nightlife",
-    "gym": "Gym",
+    "gym": "Gym & Fitness",
     "shopping_mall": "Shopping",
     "store": "Shopping",
     "clothing_store": "Shopping",
-    "supermarket": "Shopping",
-    "convenience_store": "Shopping",
-    "hospital": "Health",
-    "pharmacy": "Health",
-    "doctor": "Health",
-    "dentist": "Health",
-    "health": "Health",
+    "supermarket": "Supermarket",
+    "convenience_store": "Supermarket",
+    "hospital": "Health & Medical",
+    "pharmacy": "Pharmacy",
+    "doctor": "Health & Medical",
+    "dentist": "Dentist",
+    "health": "Health & Medical",
+    "drugstore": "Pharmacy",
+    "real_estate_agency": "Real Estate",
+    "car_repair": "Car Services",
+    "car_wash": "Car Services",
+    "car_rental": "Car Services",
+    "car_dealer": "Car Services",
+    "bank": "Bank & ATM",
+    "atm": "Bank & ATM",
+    "school": "School & Education",
+    "university": "School & Education",
+    "primary_school": "School & Education",
+    "secondary_school": "School & Education",
+    "veterinary_care": "Veterinary",
+    "laundry": "Laundry",
+    "pet_store": "Pet Store",
+    "electronics_store": "Electronics",
+    "furniture_store": "Furniture & Home",
+    "home_goods_store": "Furniture & Home",
+    "travel_agency": "Travel Agency",
+    "physiotherapist": "Physiotherapy",
 }
 
 # Google types that should EXCLUDE a business from a given category.
-# e.g. if searching for "Gym", exclude places Google classifies as yoga/spa.
+# e.g. if searching for "Gym & Fitness", exclude places Google classifies as yoga/spa.
 CATEGORY_EXCLUDE_TYPES = {
-    "Gym": {"spa", "beauty_salon", "hair_care", "yoga_studio", "travel_agency",
-            "lodging", "restaurant", "cafe", "bar", "food"},
-    "Spa": {"gym", "restaurant", "cafe", "bar", "food", "lodging"},
+    "Gym & Fitness": {"spa", "beauty_salon", "hair_care", "yoga_studio", "travel_agency",
+                      "lodging", "restaurant", "cafe", "bar", "food"},
+    "Spa & Beauty": {"gym", "restaurant", "cafe", "bar", "food", "lodging"},
     "Restaurant": {"lodging", "gym", "spa"},
     "Hotel": {"restaurant", "cafe", "bar", "food", "gym", "spa"},
     "Guest House": {"restaurant", "cafe", "bar", "food", "gym", "spa"},
+    "Yoga & Pilates": {"gym", "restaurant", "cafe", "bar", "lodging"},
+    "Barbershop": {"spa", "beauty_salon", "restaurant", "cafe"},
 }
 
 

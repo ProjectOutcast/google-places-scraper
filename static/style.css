@@ -337,6 +337,45 @@ input[type="range"]::-moz-range-thumb {
     font-size: 1rem;
 }
 
+/* ─── Secondary Categories (expandable) ──────────────────────────────── */
+
+.secondary-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+}
+
+.btn-show-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.55rem 1rem;
+    margin-top: 0.6rem;
+    background: transparent;
+    border: 1px dashed rgba(124, 92, 252, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-show-more:hover {
+    border-color: rgba(124, 92, 252, 0.4);
+    color: var(--accent);
+    background: rgba(124, 92, 252, 0.04);
+}
+
+.btn-show-more.expanded {
+    border-style: solid;
+    border-color: rgba(124, 92, 252, 0.15);
+}
+
 /* ─── Buttons ─────────────────────────────────────────────────────────── */
 
 .btn-primary {

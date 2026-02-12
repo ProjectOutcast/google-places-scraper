@@ -19,6 +19,7 @@ from flask import Flask, render_template, request, jsonify, Response, send_file
 from scraper import (
     run_scraper, export_to_excel, export_to_csv, get_summary,
     CATEGORY_PRESETS, DEFAULT_CATEGORIES,
+    PRIMARY_CATEGORIES, SECONDARY_CATEGORIES,
 )
 
 app = Flask(__name__)
@@ -259,7 +260,7 @@ def index():
 
 @app.route("/api/presets")
 def get_presets():
-    """Return category presets as JSON."""
+    """Return category presets as JSON with primary/secondary tiers."""
     return jsonify({
         "presets": {
             name: {
@@ -269,6 +270,8 @@ def get_presets():
             for name, queries in CATEGORY_PRESETS.items()
         },
         "defaults": DEFAULT_CATEGORIES,
+        "primary": PRIMARY_CATEGORIES,
+        "secondary": SECONDARY_CATEGORIES,
     })
 
 

@@ -10,18 +10,34 @@ let licensingEnabled = false;
 let checkoutUrl = '';
 
 const CATEGORY_EMOJIS = {
-    'restaurant': '🍽️', 'things-to-do': '🎯', 'spa': '💆',
-    'hotel': '🏨', 'guest-house': '🏠', 'nightlife': '🌙',
-    'coworking': '💻', 'gym': '💪', 'shopping': '🛍️', 'health': '🏥',
+    // Primary
+    'restaurant': '🍽️', 'coffee-shops': '☕', 'hotel': '🏨',
+    'guest-house': '🏠', 'things-to-do': '🎯', 'nightlife': '🌙',
+    'spa-beauty': '💆', 'gym-fitness': '💪', 'shopping': '🛍️',
+    'health': '🏥', 'real-estate': '🏘️', 'coworking': '💻',
+    // Secondary
+    'dentist': '🦷', 'veterinary': '🐾', 'car-services': '🚗',
+    'supermarket': '🛒', 'bank': '🏦', 'pharmacy': '💊',
+    'education': '🎓', 'yoga-pilates': '🧘', 'laundry': '👔',
+    'pet-store': '🐶', 'electronics': '📱', 'furniture-home': '🛋️',
+    'travel-agency': '✈️', 'barbershop': '💈', 'physiotherapy': '🏋️',
 };
 
 const CATEGORY_COLORS = {
-    'Restaurant': '#ef4444', 'Things To Do': '#f59e0b', 'Spa': '#ec4899',
-    'Hotel': '#3b82f6', 'Guest House': '#8b5cf6', 'Nightlife': '#6366f1',
-    'Coworking': '#14b8a6', 'Gym': '#f97316', 'Shopping': '#84cc16', 'Health': '#06b6d4',
+    // Primary
+    'Restaurant': '#ef4444', 'Coffee Shops': '#92400e', 'Hotel': '#3b82f6',
+    'Guest House': '#8b5cf6', 'Things To Do': '#f59e0b', 'Nightlife': '#6366f1',
+    'Spa & Beauty': '#ec4899', 'Gym & Fitness': '#f97316', 'Shopping': '#84cc16',
+    'Health & Medical': '#06b6d4', 'Real Estate': '#0d9488', 'Coworking': '#14b8a6',
+    // Secondary
+    'Dentist': '#7c3aed', 'Veterinary': '#a3e635', 'Car Services': '#64748b',
+    'Supermarket': '#22c55e', 'Bank & ATM': '#1d4ed8', 'Pharmacy': '#e11d48',
+    'School & Education': '#eab308', 'Yoga & Pilates': '#d946ef', 'Laundry': '#78716c',
+    'Pet Store': '#fb923c', 'Electronics': '#0ea5e9', 'Furniture & Home': '#b45309',
+    'Travel Agency': '#2563eb', 'Barbershop': '#dc2626', 'Physiotherapy': '#059669',
 };
 
-const DEFAULT_CATEGORIES = ['restaurant', 'things-to-do', 'spa', 'hotel', 'guest-house'];
+const DEFAULT_CATEGORIES = ['restaurant', 'coffee-shops', 'hotel', 'things-to-do', 'spa-beauty'];
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -153,32 +169,71 @@ async function loadPresets() {
     try {
         const resp = await fetch('/api/presets');
         const data = await resp.json();
-        renderCategories(data.presets, data.defaults);
+        renderCategories(data.presets, data.defaults, data.primary || [], data.secondary || []);
     } catch (e) {
         const presets = {};
         Object.keys(CATEGORY_EMOJIS).forEach(k => {
             presets[k] = { category: k.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) };
         });
-        renderCategories(presets, DEFAULT_CATEGORIES);
+        renderCategories(presets, DEFAULT_CATEGORIES, Object.keys(CATEGORY_EMOJIS).slice(0, 12), Object.keys(CATEGORY_EMOJIS).slice(12));
     }
 }
 
-function renderCategories(presets, defaults) {
+function renderCategories(presets, defaults, primaryKeys, secondaryKeys) {
     const grid = document.getElementById('categoriesGrid');
     grid.innerHTML = '';
-    Object.keys(presets).forEach(key => {
-        const preset = presets[key];
-        const label = preset.category || key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const emoji = CATEGORY_EMOJIS[key] || '📍';
-        const checked = defaults.includes(key) ? 'checked' : '';
-        const chip = document.createElement('div');
-        chip.className = 'category-chip';
-        chip.innerHTML = `
-            <input type="checkbox" id="cat-${key}" name="categories" value="${key}" ${checked}>
-            <label for="cat-${key}"><span class="category-emoji">${emoji}</span>${label}</label>
-        `;
-        grid.appendChild(chip);
+
+    // Render primary categories
+    primaryKeys.forEach(key => {
+        if (!presets[key]) return;
+        grid.appendChild(createCategoryChip(key, presets[key], defaults));
     });
+
+    // Render secondary categories (hidden by default)
+    if (secondaryKeys.length > 0) {
+        const secondaryContainer = document.createElement('div');
+        secondaryContainer.id = 'secondaryCategories';
+        secondaryContainer.className = 'secondary-categories hidden';
+
+        secondaryKeys.forEach(key => {
+            if (!presets[key]) return;
+            secondaryContainer.appendChild(createCategoryChip(key, presets[key], defaults));
+        });
+        grid.after(secondaryContainer);
+
+        // Add toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.id = 'toggleMoreCategories';
+        toggleBtn.className = 'btn-show-more';
+        toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg> Show ${secondaryKeys.length} more categories`;
+        toggleBtn.addEventListener('click', () => {
+            const sec = document.getElementById('secondaryCategories');
+            if (sec.classList.contains('hidden')) {
+                sec.classList.remove('hidden');
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 15 12 9 18 15"></polyline></svg> Show less`;
+                toggleBtn.classList.add('expanded');
+            } else {
+                sec.classList.add('hidden');
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg> Show ${secondaryKeys.length} more categories`;
+                toggleBtn.classList.remove('expanded');
+            }
+        });
+        secondaryContainer.after(toggleBtn);
+    }
+}
+
+function createCategoryChip(key, preset, defaults) {
+    const label = preset.category || key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const emoji = CATEGORY_EMOJIS[key] || '📍';
+    const checked = defaults.includes(key) ? 'checked' : '';
+    const chip = document.createElement('div');
+    chip.className = 'category-chip';
+    chip.innerHTML = `
+        <input type="checkbox" id="cat-${key}" name="categories" value="${key}" ${checked}>
+        <label for="cat-${key}"><span class="category-emoji">${emoji}</span>${label}</label>
+    `;
+    return chip;
 }
 
 // ─── localStorage: API Key ──────────────────────────────────────────────
