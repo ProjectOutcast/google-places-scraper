@@ -9,7 +9,7 @@ import json
 import uuid
 import time
 import threading
-import shutil
+import glob as globmod
 from datetime import datetime, timedelta
 
 from flask import Flask, render_template, request, jsonify, Response, send_file
@@ -21,39 +21,88 @@ from scraper import (
 
 app = Flask(__name__)
 
-# ─── Job Storage ─────────────────────────────────────────────────────────────
+# ─── Job Storage (disk-backed) ───────────────────────────────────────────────
 
 TEMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# In-memory job store: {job_id: {...}}
+# In-memory store for RUNNING jobs (progress/messages). Completed jobs are on disk.
 jobs = {}
 jobs_lock = threading.Lock()
 
-JOB_EXPIRY_HOURS = 1
+JOB_EXPIRY_HOURS = 2
 
 
-# ─── Cleanup ─────────────────────────────────────────────────────────────────
+def _job_meta_path(job_id):
+    return os.path.join(TEMP_DIR, f"{job_id}_meta.json")
+
+
+def _save_job_meta(job_id, meta):
+    """Save job metadata to disk so it survives server restarts."""
+    path = _job_meta_path(job_id)
+    # Make a serializable copy
+    safe = {k: v for k, v in meta.items() if k != "created_at"}
+    safe["created_at"] = meta.get("created_at", datetime.now()).isoformat()
+    with open(path, "w") as f:
+        json.dump(safe, f)
+
+
+def _load_job_meta(job_id):
+    """Load job metadata from disk."""
+    path = _job_meta_path(job_id)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            meta = json.load(f)
+        meta["created_at"] = datetime.fromisoformat(meta["created_at"])
+        return meta
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return None
+
+
+def _get_job(job_id):
+    """Get a job from memory (if running) or disk (if completed)."""
+    with jobs_lock:
+        job = jobs.get(job_id)
+    if job:
+        return job
+    # Try loading from disk (completed job)
+    return _load_job_meta(job_id)
+
+
+# ─── Cleanup ─────────────────────────────────────────────────────────────
 
 def cleanup_old_jobs():
     """Remove expired jobs and their files."""
     now = datetime.now()
+    cutoff = now - timedelta(hours=JOB_EXPIRY_HOURS)
+
+    # Clean in-memory jobs
     with jobs_lock:
         expired = [
             jid for jid, job in jobs.items()
-            if now - job.get("created_at", now) > timedelta(hours=JOB_EXPIRY_HOURS)
+            if job.get("created_at", now) < cutoff
         ]
         for jid in expired:
-            filepath = jobs[jid].get("filepath")
-            if filepath and os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                except OSError:
-                    pass
             del jobs[jid]
 
+    # Clean disk files older than expiry
+    for meta_file in globmod.glob(os.path.join(TEMP_DIR, "*_meta.json")):
+        try:
+            mtime = datetime.fromtimestamp(os.path.getmtime(meta_file))
+            if mtime < cutoff:
+                job_id = os.path.basename(meta_file).replace("_meta.json", "")
+                # Remove meta file
+                os.remove(meta_file)
+                # Remove associated xlsx files
+                for f in globmod.glob(os.path.join(TEMP_DIR, f"{job_id}_*")):
+                    os.remove(f)
+        except OSError:
+            pass
 
-# ─── Routes ──────────────────────────────────────────────────────────────────
+
+# ─── Routes ──────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -117,6 +166,7 @@ def start_scrape():
         "messages": [],
         "summary": None,
         "filepath": None,
+        "filename": None,
         "error": None,
         "created_at": datetime.now(),
     }
@@ -172,6 +222,8 @@ def _run_scrape_job(job_id, api_key, location, categories, radius):
                     jobs[job_id]["messages"].append(
                         f"Exported {len(businesses)} businesses to Excel."
                     )
+                    # Persist to disk so download survives restarts
+                    _save_job_meta(job_id, jobs[job_id])
         else:
             with jobs_lock:
                 if job_id in jobs:
@@ -179,6 +231,7 @@ def _run_scrape_job(job_id, api_key, location, categories, radius):
                     jobs[job_id]["progress"] = 100
                     jobs[job_id]["summary"] = {"total": 0, "by_category": {}, "avg_rating": None, "rated_count": 0, "top5": []}
                     jobs[job_id]["messages"].append("No businesses found.")
+                    _save_job_meta(job_id, jobs[job_id])
 
     except Exception as e:
         with jobs_lock:
@@ -186,6 +239,7 @@ def _run_scrape_job(job_id, api_key, location, categories, radius):
                 jobs[job_id]["status"] = "error"
                 jobs[job_id]["error"] = str(e)
                 jobs[job_id]["messages"].append(f"Error: {e}")
+                _save_job_meta(job_id, jobs[job_id])
 
 
 @app.route("/api/progress/<job_id>")
@@ -247,17 +301,17 @@ def stream_progress(job_id):
 @app.route("/api/download/<job_id>")
 def download_file(job_id):
     """Download the generated Excel file."""
-    with jobs_lock:
-        job = jobs.get(job_id)
+    # First check in-memory, then disk
+    job = _get_job(job_id)
 
     if not job:
-        return jsonify({"error": "Job not found"}), 404
+        return jsonify({"error": "Job not found. The file may have expired (files are kept for 2 hours)."}), 404
 
     filepath = job.get("filepath")
     filename = job.get("filename", "businesses.xlsx")
 
     if not filepath or not os.path.exists(filepath):
-        return jsonify({"error": "File not found"}), 404
+        return jsonify({"error": "File not found. It may have been cleaned up. Please run the scrape again."}), 404
 
     return send_file(
         filepath,

@@ -183,6 +183,12 @@ function connectSSE(jobId) {
                 eventSource = null;
                 updateProgressBar(100);
                 showResults(data.summary, data.has_file);
+                // Auto-trigger download when scrape completes
+                if (data.has_file && currentJobId) {
+                    setTimeout(() => {
+                        window.location.href = `/api/download/${currentJobId}`;
+                    }, 500);
+                }
                 break;
 
             case 'error':
