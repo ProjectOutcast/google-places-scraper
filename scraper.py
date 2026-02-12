@@ -101,6 +101,7 @@ class Business:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     google_maps_url: str = ""
+    photo_url: str = ""
     place_id: str = ""
 
 
@@ -153,7 +154,7 @@ def _get_place_details(place_id: str, api_key: str) -> dict:
         "fields": (
             "name,formatted_address,formatted_phone_number,international_phone_number,"
             "website,rating,user_ratings_total,price_level,opening_hours,"
-            "editorial_summary,geometry,url,types,business_status"
+            "editorial_summary,geometry,url,types,business_status,photos"
         ),
         "key": api_key,
     }
@@ -382,6 +383,18 @@ def run_scraper(
             continue
 
         loc = place.get("geometry", {}).get("location", {})
+
+        # Build photo URL from first photo reference
+        photo_url = ""
+        photos = place.get("photos", [])
+        if photos:
+            ref = photos[0].get("photo_reference", "")
+            if ref:
+                photo_url = (
+                    f"https://maps.googleapis.com/maps/api/place/photo"
+                    f"?maxwidth=400&photo_reference={ref}&key={api_key}"
+                )
+
         biz = Business(
             name=place.get("name", ""),
             category=category,
@@ -397,6 +410,7 @@ def run_scraper(
             latitude=loc.get("lat"),
             longitude=loc.get("lng"),
             google_maps_url=place.get("url", ""),
+            photo_url=photo_url,
             place_id=place_id,
         )
         businesses.append(biz)
@@ -436,6 +450,7 @@ def export_to_excel(businesses: list, filepath: str):
         ("Latitude", 12),
         ("Longitude", 12),
         ("Google Maps URL", 40),
+        ("Photo URL", 45),
         ("Place ID", 30),
     ]
 
@@ -468,7 +483,7 @@ def export_to_excel(businesses: list, filepath: str):
     field_order = [
         "name", "category", "rating", "reviews_count", "price_level",
         "phone", "website", "address", "opening_hours", "description",
-        "google_types", "latitude", "longitude", "google_maps_url", "place_id",
+        "google_types", "latitude", "longitude", "google_maps_url", "photo_url", "place_id",
     ]
 
     for row_idx, biz in enumerate(businesses, 2):
@@ -527,7 +542,7 @@ def export_to_csv(businesses: list, filepath: str):
     fieldnames = [
         "name", "category", "rating", "reviews_count", "price_level",
         "phone", "website", "address", "opening_hours", "description",
-        "google_types", "latitude", "longitude", "google_maps_url", "place_id",
+        "google_types", "latitude", "longitude", "google_maps_url", "photo_url", "place_id",
     ]
 
     with open(filepath, "w", newline="", encoding="utf-8") as f:
@@ -549,12 +564,26 @@ def get_summary(businesses: list) -> dict:
         for b in top5
     ]
 
+    # Full business data for preview table and map
+    biz_data = [
+        {
+            "name": b.name, "category": b.category, "rating": b.rating,
+            "reviews_count": b.reviews_count or 0, "phone": b.phone,
+            "website": b.website, "address": b.address,
+            "latitude": b.latitude, "longitude": b.longitude,
+            "photo_url": b.photo_url, "google_maps_url": b.google_maps_url,
+            "price_level": b.price_level,
+        }
+        for b in businesses
+    ]
+
     return {
         "total": len(businesses),
         "by_category": counts,
         "avg_rating": avg_rating,
         "rated_count": len(rated),
         "top5": top_list,
+        "businesses": biz_data,
     }
 
 

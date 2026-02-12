@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, Response, send_file
 
 from scraper import (
-    run_scraper, export_to_excel, get_summary,
+    run_scraper, export_to_excel, export_to_csv, get_summary,
     CATEGORY_PRESETS, DEFAULT_CATEGORIES,
 )
 
@@ -205,24 +205,29 @@ def _run_scrape_job(job_id, api_key, location, categories, radius):
         )
 
         if businesses:
-            # Generate Excel file
+            # Generate Excel + CSV files
             from scraper import slugify
-            filename = f"{slugify(location)}_businesses.xlsx"
-            filepath = os.path.join(TEMP_DIR, f"{job_id}_{filename}")
-            export_to_excel(businesses, filepath)
+            base_name = slugify(location) + "_businesses"
+            xlsx_filename = f"{base_name}.xlsx"
+            csv_filename = f"{base_name}.csv"
+            xlsx_path = os.path.join(TEMP_DIR, f"{job_id}_{xlsx_filename}")
+            csv_path = os.path.join(TEMP_DIR, f"{job_id}_{csv_filename}")
+            export_to_excel(businesses, xlsx_path)
+            export_to_csv(businesses, csv_path)
             summary = get_summary(businesses)
 
             with jobs_lock:
                 if job_id in jobs:
                     jobs[job_id]["status"] = "completed"
                     jobs[job_id]["progress"] = 100
-                    jobs[job_id]["filepath"] = filepath
-                    jobs[job_id]["filename"] = filename
+                    jobs[job_id]["filepath"] = xlsx_path
+                    jobs[job_id]["filename"] = xlsx_filename
+                    jobs[job_id]["csv_filepath"] = csv_path
+                    jobs[job_id]["csv_filename"] = csv_filename
                     jobs[job_id]["summary"] = summary
                     jobs[job_id]["messages"].append(
-                        f"Exported {len(businesses)} businesses to Excel."
+                        f"Exported {len(businesses)} businesses to Excel & CSV."
                     )
-                    # Persist to disk so download survives restarts
                     _save_job_meta(job_id, jobs[job_id])
         else:
             with jobs_lock:
@@ -300,25 +305,27 @@ def stream_progress(job_id):
 
 @app.route("/api/download/<job_id>")
 def download_file(job_id):
-    """Download the generated Excel file."""
-    # First check in-memory, then disk
+    """Download the generated file. Use ?format=csv for CSV."""
     job = _get_job(job_id)
 
     if not job:
         return jsonify({"error": "Job not found. The file may have expired (files are kept for 2 hours)."}), 404
 
-    filepath = job.get("filepath")
-    filename = job.get("filename", "businesses.xlsx")
+    fmt = request.args.get("format", "xlsx")
+
+    if fmt == "csv":
+        filepath = job.get("csv_filepath")
+        filename = job.get("csv_filename", "businesses.csv")
+        mimetype = "text/csv"
+    else:
+        filepath = job.get("filepath")
+        filename = job.get("filename", "businesses.xlsx")
+        mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
     if not filepath or not os.path.exists(filepath):
         return jsonify({"error": "File not found. It may have been cleaned up. Please run the scrape again."}), 404
 
-    return send_file(
-        filepath,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    return send_file(filepath, as_attachment=True, download_name=filename, mimetype=mimetype)
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
