@@ -1,7 +1,0 @@
-[phases.build]
-# No secrets needed at build time
-[phases.setup]
-# No secrets needed at setup time
-
-[start]
-cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300"
