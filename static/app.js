@@ -6,8 +6,6 @@ let leafletMap = null;
 let currentBusinesses = [];
 let sortColumn = 'rating';
 let sortAsc = false;
-let licensingEnabled = false;
-let checkoutUrl = '';
 
 const CATEGORY_EMOJIS = {
     // Primary
@@ -42,126 +40,10 @@ const DEFAULT_CATEGORIES = ['restaurant', 'coffee-shops', 'hotel', 'things-to-do
 // ─── Init ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    initLicenseGate();
-});
-
-// ─── License Gate ─────────────────────────────────────────────────────────
-
-async function initLicenseGate() {
-    try {
-        const resp = await fetch('/api/license-config');
-        const config = await resp.json();
-        licensingEnabled = config.enabled;
-        checkoutUrl = config.checkout_url || '';
-    } catch (e) {
-        // If config fails, assume no licensing (local dev)
-        licensingEnabled = false;
-    }
-
-    if (!licensingEnabled) {
-        // No gate — show scraper directly
-        showScraperUI();
-        return;
-    }
-
-    // Set up buy button
-    const buyBtn = document.getElementById('buyBtn');
-    if (buyBtn && checkoutUrl) {
-        buyBtn.href = checkoutUrl;
-    }
-
-    // Set up activate button
-    document.getElementById('activateBtn').addEventListener('click', handleActivation);
-    document.getElementById('licenseKeyInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleActivation();
-    });
-
-    // Check if user already has a saved license
-    const savedKey = localStorage.getItem('scraper_license_key');
-    if (savedKey) {
-        // Validate saved key
-        showLicenseGate();
-        setLicenseMessage('Verifying license...', '');
-        try {
-            const resp = await fetch('/api/validate-license', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ license_key: savedKey }),
-            });
-            const data = await resp.json();
-            if (data.valid) {
-                showScraperUI();
-                return;
-            }
-        } catch (e) {
-            // Network error — let them through if they had a key (grace)
-            showScraperUI();
-            return;
-        }
-        // Invalid saved key — clear and show gate
-        localStorage.removeItem('scraper_license_key');
-        setLicenseMessage('Your license key has expired or is invalid. Please re-enter it.', 'error');
-    }
-
-    showLicenseGate();
-}
-
-function showLicenseGate() {
-    document.getElementById('licenseGate').classList.remove('hidden');
-    document.getElementById('scraperContent').classList.add('hidden');
-}
-
-function showScraperUI() {
-    document.getElementById('licenseGate').classList.add('hidden');
-    document.getElementById('scraperContent').classList.remove('hidden');
-    // Initialize scraper UI
     loadPresets();
     setupEventListeners();
     loadSavedApiKey();
-}
-
-function setLicenseMessage(text, type) {
-    const el = document.getElementById('licenseMessage');
-    el.textContent = text;
-    el.className = 'license-message' + (type ? ' ' + type : '');
-}
-
-async function handleActivation() {
-    const input = document.getElementById('licenseKeyInput');
-    const btn = document.getElementById('activateBtn');
-    const key = input.value.trim();
-
-    if (!key) {
-        setLicenseMessage('Please enter a license key.', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Verifying...';
-    setLicenseMessage('', '');
-
-    try {
-        const resp = await fetch('/api/validate-license', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ license_key: key }),
-        });
-        const data = await resp.json();
-
-        if (data.valid) {
-            localStorage.setItem('scraper_license_key', key);
-            setLicenseMessage('License activated! Loading...', 'success');
-            setTimeout(() => showScraperUI(), 600);
-        } else {
-            setLicenseMessage(data.error || 'Invalid license key.', 'error');
-        }
-    } catch (e) {
-        setLicenseMessage('Network error. Please try again.', 'error');
-    }
-
-    btn.disabled = false;
-    btn.textContent = 'Activate';
-}
+});
 
 // ─── Category Presets ────────────────────────────────────────────────────
 
@@ -344,9 +226,6 @@ async function handleSubmit(e) {
 
     try {
         const body = { api_key: apiKey, location, radius, categories, custom_queries: customQueries };
-        // Include license key if licensing is enabled
-        const savedLicense = localStorage.getItem('scraper_license_key');
-        if (savedLicense) body.license_key = savedLicense;
 
         const resp = await fetch('/api/scrape', {
             method: 'POST',
@@ -354,16 +233,6 @@ async function handleSubmit(e) {
             body: JSON.stringify(body),
         });
         const data = await resp.json();
-
-        // Handle license rejection
-        if (resp.status === 403 && licensingEnabled) {
-            localStorage.removeItem('scraper_license_key');
-            showLicenseGate();
-            setLicenseMessage('Your license key is no longer valid. Please re-enter it.', 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Start Scraping`;
-            return;
-        }
 
         if (!resp.ok) throw new Error(data.error || 'Failed to start scraping');
 

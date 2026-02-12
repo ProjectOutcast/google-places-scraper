@@ -8,12 +8,10 @@ import os
 import json
 import uuid
 import time
-import hashlib
 import threading
 import glob as globmod
 from datetime import datetime, timedelta
 
-import requests as http_requests
 from flask import Flask, render_template, request, jsonify, Response, send_file
 
 from scraper import (
@@ -28,148 +26,6 @@ app = Flask(__name__)
 
 TEMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
 os.makedirs(TEMP_DIR, exist_ok=True)
-
-# ─── Licensing (Lemon Squeezy) ───────────────────────────────────────────────
-
-LS_API_KEY = os.environ.get("LEMON_SQUEEZY_API_KEY", "").strip()
-LS_STORE_ID = os.environ.get("LEMON_SQUEEZY_STORE_ID", "").strip()
-LS_CHECKOUT_URL = os.environ.get("LEMON_SQUEEZY_CHECKOUT_URL", "").strip()
-LICENSE_CACHE_PATH = os.path.join(TEMP_DIR, "license_cache.json")
-LICENSE_CACHE_TTL_HOURS = 72
-
-
-def is_licensing_enabled():
-    return bool(LS_API_KEY and LS_STORE_ID and LS_CHECKOUT_URL)
-
-
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.strip().encode()).hexdigest()
-
-
-def _load_license_cache() -> dict:
-    if not os.path.exists(LICENSE_CACHE_PATH):
-        return {}
-    try:
-        with open(LICENSE_CACHE_PATH, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def _save_license_cache(cache: dict):
-    try:
-        with open(LICENSE_CACHE_PATH, "w") as f:
-            json.dump(cache, f)
-    except OSError:
-        pass
-
-
-def _check_cache(key_hash: str):
-    """Check if key is in cache and still valid. Returns True/False/None (not found)."""
-    cache = _load_license_cache()
-    entry = cache.get(key_hash)
-    if not entry:
-        return None
-    last_checked = datetime.fromisoformat(entry.get("last_checked", "2000-01-01"))
-    if datetime.now() - last_checked > timedelta(hours=LICENSE_CACHE_TTL_HOURS):
-        return None  # Expired, needs re-validation
-    return entry.get("valid", False)
-
-
-def _cache_license(key_hash: str, valid: bool):
-    cache = _load_license_cache()
-    cache[key_hash] = {
-        "valid": valid,
-        "last_checked": datetime.now().isoformat(),
-    }
-    _save_license_cache(cache)
-
-
-def _validate_with_ls(license_key: str) -> tuple:
-    """
-    Validate a license key with Lemon Squeezy API.
-    Returns (valid: bool, error_message: str).
-    """
-    # Try activation first
-    try:
-        resp = http_requests.post(
-            "https://api.lemonsqueezy.com/v1/licenses/activate",
-            json={
-                "license_key": license_key,
-                "instance_name": "scraper",
-            },
-            headers={
-                "Accept": "application/json",
-            },
-            timeout=15,
-        )
-        data = resp.json()
-
-        if data.get("activated") or data.get("valid"):
-            # Verify store
-            meta = data.get("meta", {})
-            store_id = str(meta.get("store_id", ""))
-            if LS_STORE_ID and store_id and store_id != LS_STORE_ID:
-                return False, "License key does not belong to this product."
-            return True, ""
-
-        error = data.get("error", "")
-        # If already activated on this instance, try validate
-        if "already" in str(error).lower() or resp.status_code == 422:
-            resp2 = http_requests.post(
-                "https://api.lemonsqueezy.com/v1/licenses/validate",
-                json={
-                    "license_key": license_key,
-                    "instance_name": "scraper",
-                },
-                headers={
-                    "Accept": "application/json",
-                },
-                timeout=15,
-            )
-            data2 = resp2.json()
-            if data2.get("valid"):
-                meta2 = data2.get("meta", {})
-                store_id2 = str(meta2.get("store_id", ""))
-                if LS_STORE_ID and store_id2 and store_id2 != LS_STORE_ID:
-                    return False, "License key does not belong to this product."
-                return True, ""
-            return False, data2.get("error", "Invalid license key.")
-
-        return False, data.get("error", "Invalid license key.")
-
-    except http_requests.RequestException:
-        # LS API is down — check cache as grace period
-        key_hash = _hash_key(license_key)
-        cache = _load_license_cache()
-        entry = cache.get(key_hash)
-        if entry and entry.get("valid"):
-            return True, ""  # Grace: let them through
-        return False, "Unable to verify license. Please try again later."
-
-
-def validate_license(license_key: str) -> tuple:
-    """
-    Full license validation flow: cache check → LS API → cache result.
-    Returns (valid: bool, error: str).
-    """
-    if not license_key or not license_key.strip():
-        return False, "License key is required."
-
-    key_hash = _hash_key(license_key)
-
-    # Check cache first
-    cached = _check_cache(key_hash)
-    if cached is True:
-        return True, ""
-    if cached is False:
-        return False, "License key is invalid or expired."
-
-    # Not in cache or expired — call LS API
-    valid, error = _validate_with_ls(license_key)
-    _cache_license(key_hash, valid)
-    return valid, error
-
 
 # In-memory store for RUNNING jobs (progress/messages). Completed jobs are on disk.
 jobs = {}
@@ -275,30 +131,6 @@ def get_presets():
     })
 
 
-@app.route("/api/license-config")
-def license_config():
-    """Return licensing configuration for the frontend."""
-    return jsonify({
-        "enabled": is_licensing_enabled(),
-        "checkout_url": LS_CHECKOUT_URL if is_licensing_enabled() else "",
-    })
-
-
-@app.route("/api/validate-license", methods=["POST"])
-def validate_license_route():
-    """Validate a license key."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"valid": False, "error": "No data provided"}), 400
-
-    license_key = data.get("license_key", "").strip()
-    valid, error = validate_license(license_key)
-
-    if valid:
-        return jsonify({"valid": True})
-    return jsonify({"valid": False, "error": error})
-
-
 @app.route("/api/scrape", methods=["POST"])
 def start_scrape():
     """Start a new scraping job."""
@@ -321,13 +153,6 @@ def start_scrape():
         return jsonify({"error": "Location is required"}), 400
     if not categories and not custom_queries:
         return jsonify({"error": "Select at least one category or enter custom queries"}), 400
-
-    # License check (server-side guard)
-    if is_licensing_enabled():
-        license_key = data.get("license_key", "").strip()
-        valid, error = validate_license(license_key)
-        if not valid:
-            return jsonify({"error": "Invalid or missing license key. Please activate your license."}), 403
 
     # Merge categories with custom queries
     all_categories = list(categories)
