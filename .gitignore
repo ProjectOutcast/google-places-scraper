@@ -1,8 +1,10 @@
 __pycache__/
 *.pyc
 temp/
+output/
 *.xlsx
 *.csv
 .env
 venv/
 .venv/
+*.log
