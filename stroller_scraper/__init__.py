@@ -1,1 +1,0 @@
-# UAE Baby Stroller Scraper

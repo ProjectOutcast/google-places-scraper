@@ -20,13 +20,6 @@ from scraper import (
     PRIMARY_CATEGORIES, SECONDARY_CATEGORIES,
 )
 
-import sys
-import asyncio
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "stroller_scraper"))
-from stroller_scraper.retailers import get_scraper_registry
-from stroller_scraper.main import run_all_scrapers as run_product_scrapers
-from stroller_scraper.exporter import export_combined_csv
-
 app = Flask(__name__)
 
 # ─── Job Storage (disk-backed) ───────────────────────────────────────────────
@@ -336,119 +329,6 @@ def download_file(job_id):
         return jsonify({"error": "File not found. It may have been cleaned up. Please run the scrape again."}), 404
 
     return send_file(filepath, as_attachment=True, download_name=filename, mimetype=mimetype)
-
-
-# ─── Product Scraper Routes ───────────────────────────────────────────────
-
-@app.route("/scraper")
-def scraper_page():
-    return render_template("scraper.html")
-
-
-@app.route("/api/retailers")
-def get_retailers():
-    return jsonify({"retailers": sorted(get_scraper_registry().keys())})
-
-
-@app.route("/api/product-scrape", methods=["POST"])
-def start_product_scrape():
-    cleanup_old_jobs()
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-
-    keyword = data.get("keyword", "").strip()
-    retailers = data.get("retailers", [])
-
-    if not keyword:
-        return jsonify({"error": "Keyword is required"}), 400
-    if not retailers:
-        return jsonify({"error": "Select at least one retailer"}), 400
-
-    job_id = str(uuid.uuid4())[:8]
-    job = {
-        "id": job_id,
-        "status": "running",
-        "progress": 0,
-        "messages": [],
-        "summary": None,
-        "filepath": None,
-        "filename": None,
-        "csv_filepath": None,
-        "csv_filename": None,
-        "error": None,
-        "created_at": datetime.now(),
-    }
-
-    with jobs_lock:
-        jobs[job_id] = job
-
-    thread = threading.Thread(
-        target=_run_product_scrape_job,
-        args=(job_id, keyword, retailers),
-        daemon=True,
-    )
-    thread.start()
-
-    return jsonify({"job_id": job_id})
-
-
-def _run_product_scrape_job(job_id, keyword, retailers):
-    def progress_callback(message, percent=None):
-        with jobs_lock:
-            if job_id in jobs:
-                jobs[job_id]["messages"].append(message)
-                if percent is not None:
-                    jobs[job_id]["progress"] = percent
-
-    try:
-        output_dir = os.path.join(TEMP_DIR, job_id)
-        os.makedirs(output_dir, exist_ok=True)
-
-        products = asyncio.run(
-            run_product_scrapers(
-                retailers=retailers,
-                headless=True,
-                resume=False,
-                output_dir=output_dir,
-                keyword=keyword,
-                progress_callback=progress_callback,
-            )
-        )
-
-        if products:
-            csv_filename = f"{keyword.replace(' ', '_')}_products.csv"
-            csv_path = os.path.join(TEMP_DIR, f"{job_id}_{csv_filename}")
-            export_combined_csv(products, csv_path)
-
-            with jobs_lock:
-                if job_id in jobs:
-                    jobs[job_id]["status"] = "completed"
-                    jobs[job_id]["progress"] = 100
-                    jobs[job_id]["csv_filepath"] = csv_path
-                    jobs[job_id]["csv_filename"] = csv_filename
-                    jobs[job_id]["summary"] = {"total": len(products)}
-                    jobs[job_id]["messages"].append(
-                        f"Done! Exported {len(products)} products to CSV."
-                    )
-                    _save_job_meta(job_id, jobs[job_id])
-        else:
-            with jobs_lock:
-                if job_id in jobs:
-                    jobs[job_id]["status"] = "completed"
-                    jobs[job_id]["progress"] = 100
-                    jobs[job_id]["summary"] = {"total": 0}
-                    jobs[job_id]["messages"].append("No products found.")
-                    _save_job_meta(job_id, jobs[job_id])
-
-    except Exception as e:
-        with jobs_lock:
-            if job_id in jobs:
-                jobs[job_id]["status"] = "error"
-                jobs[job_id]["error"] = str(e)
-                jobs[job_id]["messages"].append(f"Error: {e}")
-                _save_job_meta(job_id, jobs[job_id])
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
